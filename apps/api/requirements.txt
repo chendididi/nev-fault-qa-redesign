@@ -1,0 +1,25 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+fastapi==0.115.14
+uvicorn[standard]==0.35.0
+pydantic-settings==2.10.1
+SQLAlchemy==2.0.41
+psycopg[binary]==3.2.9
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.20
+httpx==0.28.1
+boto3==1.39.3
+pypdf==5.7.0
+python-docx==1.2.0
+openpyxl==3.1.5
+pillow==11.3.0
+PyMuPDF==1.27.2.3
+torch==2.11.0+cpu
+transformers==4.57.6
+FlagEmbedding==1.4.0
+modelscope==1.36.3
+huggingface-hub==0.36.2
+pytest==8.4.1
+pytest-asyncio==1.0.0
