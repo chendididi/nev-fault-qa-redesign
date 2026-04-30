@@ -1,0 +1,50 @@
+[
+  {
+    "id": "dtc_fast_charge_hvil",
+    "question": "P1A0C 快充互锁异常怎么排查？",
+    "expected_keywords": ["P1A0C", "快充", "互锁"],
+    "expected_documents": ["快充", "HVIL"]
+  },
+  {
+    "id": "symptom_fast_charge_fail",
+    "question": "车辆无法快充，仪表提示充电系统故障，充电桩显示握手失败，优先检查什么？",
+    "expected_keywords": ["快充", "充电系统故障", "握手失败"],
+    "expected_documents": ["快充", "仪表"]
+  },
+  {
+    "id": "insulation_low",
+    "question": "BMS 报绝缘电阻低于 100kΩ，维修前安全步骤是什么？",
+    "expected_keywords": ["BMS", "绝缘", "100kΩ", "安全"],
+    "expected_documents": ["BMS", "HVIL", "高压电池"]
+  },
+  {
+    "id": "ready_fail_12v_ok",
+    "question": "车辆 READY 不上电，但 12V 电池电压正常，下一步应该查哪里？",
+    "expected_keywords": ["READY", "12V", "唤醒"],
+    "expected_documents": ["低压", "VCU"]
+  },
+  {
+    "id": "can_offline",
+    "question": "多个控制器离线并报 CAN 通讯故障，如何定位故障范围？",
+    "expected_keywords": ["CAN", "通讯", "离线"],
+    "expected_documents": ["VCU", "CAN"]
+  },
+  {
+    "id": "mcu_overheat_derating",
+    "question": "电机控制器温度 95℃ 且车辆限扭，怎么判断是水泵还是传感器问题？",
+    "expected_keywords": ["电机控制器", "95℃", "限扭", "水泵"],
+    "expected_documents": ["驱动电机", "热管理"]
+  },
+  {
+    "id": "obc_soc_not_rising",
+    "question": "慢充时 SOC 不上升，可能是 OBC 还是 BMS 问题？",
+    "expected_keywords": ["慢充", "SOC", "OBC", "BMS"],
+    "expected_documents": ["OBC", "BMS"]
+  },
+  {
+    "id": "flooded_vehicle_safety",
+    "question": "涉水车高压系统报警，交车前必须检查哪些项目？",
+    "expected_keywords": ["涉水", "高压", "安全", "绝缘"],
+    "expected_documents": ["涉水", "事故车"]
+  }
+]

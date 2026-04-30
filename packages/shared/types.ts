@@ -15,6 +15,18 @@ export type Citation = {
   filename: string;
   content: string;
   score: number;
+  vector_score?: number;
+  rerank_score?: number;
+  keyword_matches?: string[];
+  sources?: string[];
+  metadata?: {
+    page?: number;
+    heading?: string;
+    system?: string[];
+    dtc?: string[];
+    vehicle_model?: string;
+    keywords?: string[];
+  };
 };
 
 export type ModelConfig = {

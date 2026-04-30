@@ -1,7 +1,7 @@
 import json
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from app.knowledge.parser import chunk_text, extract_text
+from app.knowledge.parser import chunk_text, extract_repair_metadata, extract_text
 from app.knowledge.storage import ObjectStorage
 from app.models.provider import OpenAICompatibleProvider, active_model_config, embed_texts, vector_literal
 
@@ -28,6 +28,12 @@ async def ingest_document(db: Session, document_id: str) -> None:
         if chunks:
             embeddings = await embed_texts(db, chunks, model_config)
             for index, (content, embedding) in enumerate(zip(chunks, embeddings, strict=False)):
+                metadata = {
+                    "title": doc["title"],
+                    "filename": doc["filename"],
+                    "chunk_index": index,
+                    **extract_repair_metadata(content),
+                }
                 db.execute(text("""
                     INSERT INTO chunks (document_id, knowledge_base_id, content, metadata, embedding)
                     VALUES (:document_id, :knowledge_base_id, :content, cast(:metadata as jsonb), cast(:embedding as vector))
@@ -35,7 +41,7 @@ async def ingest_document(db: Session, document_id: str) -> None:
                     "document_id": document_id,
                     "knowledge_base_id": doc["knowledge_base_id"],
                     "content": content,
-                    "metadata": json.dumps({"title": doc["title"], "filename": doc["filename"], "chunk_index": index}, ensure_ascii=False),
+                    "metadata": json.dumps(metadata, ensure_ascii=False),
                     "embedding": vector_literal(embedding),
                 })
         db.execute(text("UPDATE documents SET status='ready', error=NULL, updated_at=now() WHERE id=:id"), {"id": document_id})

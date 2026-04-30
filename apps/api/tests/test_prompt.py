@@ -1,4 +1,4 @@
-from app.rag.service import build_prompt
+from app.rag.service import build_prompt, extract_retrieval_terms
 
 
 def test_prompt_requires_structured_answer():
@@ -23,3 +23,13 @@ def test_prompt_includes_chat_history():
     assert "历史对话上下文" in content
     assert "用户: 车辆无法快充" in content
     assert "诊断助手: 先检查充电口和 BMS。" in content
+
+
+def test_extract_retrieval_terms_finds_dtc_and_domain_terms():
+    terms = extract_retrieval_terms("P1A0C 快充互锁异常，BMS 是否会影响 HVIL？")
+
+    assert "P1A0C" in terms
+    assert "快充" in terms
+    assert "互锁" in terms
+    assert "BMS" in terms
+    assert "HVIL" in terms

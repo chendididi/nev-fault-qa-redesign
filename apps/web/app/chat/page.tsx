@@ -6,8 +6,20 @@ import { AppShell } from "@/components/shell";
 import { ApiError, api } from "@/lib/api";
 
 type KB = { id: string; name: string };
-type Citation = { id: string; score: number; content: string; title: string; filename: string };
-type Message = { role: "user" | "assistant"; content: string; citations?: Citation[] };
+type CitationMetadata = { page?: number; heading?: string; system?: string[]; dtc?: string[]; vehicle_model?: string; keywords?: string[] };
+type Citation = {
+  id: string;
+  score: number;
+  vector_score?: number;
+  rerank_score?: number;
+  keyword_matches?: string[];
+  sources?: string[];
+  metadata?: CitationMetadata;
+  content: string;
+  title: string;
+  filename: string;
+};
+type Message = { role: "user" | "assistant"; content: string; citations?: Citation[]; imageDescription?: string | null };
 type ApiMessage = { role: "user" | "assistant" | "system"; content: string; citations?: Citation[] };
 type Conversation = {
   id: string;
@@ -82,9 +94,9 @@ export default function ChatPage() {
     if (image) form.set("image", image);
     setMessages((prev) => [...prev, {role: "user", content: text}]);
     try {
-      const data = await api<{session_id: string; answer: string; citations: Citation[]}>("/api/chat", {method: "POST", body: form});
+      const data = await api<{session_id: string; answer: string; image_description?: string | null; citations: Citation[]}>("/api/chat", {method: "POST", body: form});
       setSessionId(data.session_id);
-      setMessages((prev) => [...prev, {role: "assistant", content: data.answer, citations: data.citations}]);
+      setMessages((prev) => [...prev, {role: "assistant", content: data.answer, citations: data.citations, imageDescription: data.image_description}]);
       setQuestion("");
       setImage(null);
       await loadConversations();
@@ -211,7 +223,13 @@ export default function ChatPage() {
               {messages.map((message, index) => (
                 <article key={index} className={`rounded-md border p-4 ${message.role === "user" ? "border-teal-200 bg-teal-50" : "border-line bg-white"}`}>
                   <div className="mb-2 text-xs font-semibold text-slate-500">{message.role === "user" ? "技师" : "诊断助手"}</div>
-                  <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{message.content}</pre>
+                  {message.role === "assistant" && message.imageDescription && (
+                    <div className="mb-3 rounded-md border border-sky-100 bg-sky-50 p-3 text-xs leading-5 text-sky-800">
+                      <div className="mb-1 font-semibold">图片理解结果</div>
+                      {message.imageDescription}
+                    </div>
+                  )}
+                  {message.role === "assistant" ? <DiagnosticCards content={message.content} /> : <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{message.content}</pre>}
                 </article>
               ))}
               {loading && <PendingAssistantMessage elapsedSeconds={elapsedSeconds} hasImage={pendingHasImage} />}
@@ -237,17 +255,80 @@ export default function ChatPage() {
           <h2 className="text-sm font-semibold">最近引用</h2>
           <div className="mt-4 space-y-3">
             {messages.flatMap((m) => m.citations || []).slice(-6).map((citation) => (
-              <div key={citation.id} className="rounded-md border border-line p-3">
-                <div className="text-xs font-semibold">{citation.title}</div>
-                <div className="mt-1 text-xs text-slate-500">{citation.filename} · score {citation.score.toFixed(3)}</div>
-                <p className="mt-2 line-clamp-5 text-xs leading-5 text-slate-600">{citation.content}</p>
-              </div>
+              <CitationEvidenceCard key={citation.id} citation={citation} />
             ))}
           </div>
         </aside>
       </div>
     </AppShell>
   );
+}
+
+function DiagnosticCards({content}: {content: string}) {
+  const sections = splitDiagnosticSections(content);
+  if (sections.length < 2) {
+    return <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{content}</pre>;
+  }
+  return (
+    <div className="space-y-3">
+      {sections.map((section) => (
+        <section key={section.title} className={`rounded-md border p-3 ${section.title.includes("安全") ? "border-amber-200 bg-amber-50" : "border-line bg-white"}`}>
+          <div className={`mb-2 text-sm font-semibold ${section.title.includes("安全") ? "text-amber-800" : "text-slate-800"}`}>{section.title}</div>
+          <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-slate-700">{section.body}</pre>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function CitationEvidenceCard({citation}: {citation: Citation}) {
+  const metadata = citation.metadata || {};
+  const chips = [
+    metadata.page ? `第 ${metadata.page} 页` : "",
+    metadata.heading || "",
+    ...(metadata.system || []),
+    ...(metadata.dtc || []),
+    ...(citation.keyword_matches || []),
+  ].filter(Boolean).slice(0, 6);
+
+  return (
+    <div className="rounded-md border border-line p-3">
+      <div className="text-xs font-semibold">{citation.title}</div>
+      <div className="mt-1 text-xs text-slate-500">{citation.filename}</div>
+      {chips.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {chips.map((chip) => (
+            <span key={chip} className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700">{chip}</span>
+          ))}
+        </div>
+      )}
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
+        <span>最终 {formatScore(citation.score)}</span>
+        <span>向量 {formatScore(citation.vector_score)}</span>
+        <span>重排 {formatScore(citation.rerank_score)}</span>
+        <span>{(citation.sources || []).join(" + ") || "vector"}</span>
+      </div>
+      <p className="mt-2 line-clamp-5 text-xs leading-5 text-slate-600">{citation.content}</p>
+    </div>
+  );
+}
+
+function splitDiagnosticSections(content: string) {
+  const matches = Array.from(content.matchAll(/(?:^|\n)(\d+\.\s*[^\n]+)\n/g));
+  if (!matches.length) return [];
+  return matches.map((match, index) => {
+    const start = (match.index || 0) + (match[0].startsWith("\n") ? 1 : 0);
+    const bodyStart = start + match[1].length;
+    const end = index + 1 < matches.length ? matches[index + 1].index || content.length : content.length;
+    return {
+      title: match[1].trim(),
+      body: content.slice(bodyStart, end).trim(),
+    };
+  }).filter((section) => section.body);
+}
+
+function formatScore(value?: number) {
+  return typeof value === "number" ? value.toFixed(3) : "-";
 }
 
 function formatConversationTime(value: string) {

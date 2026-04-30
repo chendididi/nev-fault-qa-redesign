@@ -328,13 +328,27 @@ async def chat(
         """), {
             "message_id": assistant_msg["id"],
             "chunk_id": hit["id"],
-            "score": hit["score"],
+            "score": hit.get("rerank_score", hit["score"]),
             "content": hit["content"],
-            "citation": json.dumps({"title": hit["title"], "filename": hit["filename"]}, ensure_ascii=False),
+            "citation": json.dumps({
+                "title": hit["title"],
+                "filename": hit["filename"],
+                "metadata": hit.get("metadata") or {},
+                "vector_score": hit.get("vector_score", hit["score"]),
+                "rerank_score": hit.get("rerank_score"),
+                "keyword_matches": hit.get("keyword_matches", []),
+                "sources": hit.get("sources", []),
+            }, ensure_ascii=False),
         })
     db.execute(text("UPDATE chat_sessions SET updated_at=now() WHERE id=:id"), {"id": session_id})
     db.commit()
-    return {"session_id": session_id, "question_message_id": str(user_msg["id"]), "answer": answer, "citations": [serialize_hit(hit) for hit in hits]}
+    return {
+        "session_id": session_id,
+        "question_message_id": str(user_msg["id"]),
+        "answer": answer,
+        "image_description": image_description,
+        "citations": [serialize_hit(hit) for hit in hits],
+    }
 
 
 @app.get("/api/chat/sessions/{session_id}/messages")
@@ -362,6 +376,11 @@ def session_messages(session_id: str, user: dict = Depends(get_current_user), db
             "content": hit["content"],
             "title": citation.get("title", ""),
             "filename": citation.get("filename", ""),
+            "metadata": citation.get("metadata", {}),
+            "vector_score": citation.get("vector_score"),
+            "rerank_score": citation.get("rerank_score"),
+            "keyword_matches": citation.get("keyword_matches", []),
+            "sources": citation.get("sources", []),
         })
     for message in messages:
         message["citations"] = hits_by_message.get(message["id"], [])
@@ -396,6 +415,11 @@ def serialize_hit(hit: dict) -> dict:
     return {
         "id": str(hit["id"]),
         "score": hit.get("rerank_score", hit["score"]),
+        "vector_score": hit.get("vector_score", hit["score"]),
+        "rerank_score": hit.get("rerank_score"),
+        "keyword_matches": hit.get("keyword_matches", []),
+        "sources": hit.get("sources", []),
+        "metadata": hit.get("metadata") or {},
         "content": hit["content"],
         "title": hit["title"],
         "filename": hit["filename"],
