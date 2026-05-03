@@ -89,11 +89,23 @@ input, textarea, select {
     linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 92%, #111) 0%, var(--bg-quinary) 100%);
 }
 
+.app-shell-scrollable {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+}
+
 .app-content {
   min-width: 0;
   flex: 1;
   height: calc(100vh - 48px);
   overflow: hidden;
+}
+
+.app-shell-scrollable .app-content {
+  height: auto;
+  min-height: calc(100vh - 48px);
+  overflow: visible;
 }
 
 .app-content-scrollable {
@@ -245,6 +257,10 @@ input, textarea, select {
 
   .app-content {
     height: auto;
+    min-height: calc(100vh - 24px);
+  }
+
+  .app-shell-scrollable .app-content {
     min-height: calc(100vh - 24px);
   }
 

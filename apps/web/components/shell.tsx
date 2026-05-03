@@ -5,11 +5,18 @@ type AppShellProps = {
   navigationLocked?: boolean;
   navigationLockMessage?: string;
   contentScrollable?: boolean;
+  pageScrollable?: boolean;
 };
 
-export function AppShell({ children, navigationLocked = false, navigationLockMessage, contentScrollable = false }: AppShellProps) {
+export function AppShell({
+  children,
+  navigationLocked = false,
+  navigationLockMessage,
+  contentScrollable = false,
+  pageScrollable = false,
+}: AppShellProps) {
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${pageScrollable ? "app-shell-scrollable" : ""}`}>
       <Nav locked={navigationLocked} lockMessage={navigationLockMessage} />
       <main className={`app-content ${contentScrollable ? "app-content-scrollable" : ""}`}>{children}</main>
     </div>
