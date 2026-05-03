@@ -95,6 +95,13 @@ input, textarea, select {
   overflow: visible;
 }
 
+.app-shell-admin-scroll {
+  align-items: stretch;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
 .app-content {
   min-width: 0;
   flex: 1;
@@ -109,8 +116,18 @@ input, textarea, select {
 }
 
 .app-content-scrollable {
-  overflow-y: auto;
-  overflow-x: hidden;
+  min-height: 0;
+  overflow-x: hidden !important;
+  overflow-y: scroll !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-shell-admin-scroll .app-content {
+  height: calc(100vh - 48px);
+  max-height: calc(100vh - 48px);
+  min-height: 0;
+  overflow-y: scroll !important;
 }
 
 .glass-panel {
@@ -266,6 +283,18 @@ input, textarea, select {
 
   .app-content-scrollable {
     overflow: visible;
+  }
+
+  .app-shell-admin-scroll {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .app-shell-admin-scroll .app-content {
+    height: auto;
+    max-height: none;
+    overflow: visible !important;
   }
 
   .page-shell {
