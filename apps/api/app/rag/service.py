@@ -1,7 +1,10 @@
 import re
+from typing import AsyncIterator
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from app.models.provider import OpenAICompatibleProvider, active_model_config, embed_texts, rerank_hits, vector_literal
+
+from app.models.provider import chat_for_task, demo_answer, embed_texts, get_app_setting, rerank_hits, stream_for_task, vector_literal
 
 
 DOMAIN_TERMS = [
@@ -58,8 +61,7 @@ async def retrieve(
     if not chunk_count:
         return []
 
-    model_config = active_model_config(db)
-    embedding = (await embed_texts(db, [query], model_config))[0]
+    embedding = (await embed_texts(db, [query]))[0]
     vector_limit = max(limit * 4, 12)
     rows = _vector_rows(db, embedding, knowledge_base_id, vector_limit)
     hits = _merge_hits([dict(row) for row in rows], query, source="vector")
@@ -71,7 +73,7 @@ async def retrieve(
     ranked = sorted(hits, key=_pre_rerank_score, reverse=True)
     if not use_rerank:
         return ranked[:limit]
-    return await rerank_hits(db, query, ranked[:max(limit * 5, 20)], limit=limit, config=model_config)
+    return await rerank_hits(db, query, ranked[:max(limit * 5, 20)], limit=limit)
 
 
 def extract_retrieval_terms(query: str) -> list[str]:
@@ -203,14 +205,73 @@ async def answer_question(
     image_description: str | None = None,
     history: list[dict] | None = None,
 ) -> tuple[str, list[dict]]:
+    messages, hits = await prepare_answer_context(db, question, knowledge_base_id, image_description, history)
+    demo_mode = get_app_setting(db, "demo_mode", "fallback")
+    if demo_mode == "always":
+        return demo_answer(question, hits, image_description), hits
+    try:
+        answer = await chat_for_task(db, "chat", messages)
+    except Exception as exc:
+        try:
+            answer = await chat_for_task(db, "fallback_chat", messages)
+        except Exception:
+            if demo_mode in ("fallback", "always"):
+                answer = demo_answer(question, hits, image_description)
+            else:
+                answer = _degraded_answer(exc, hits)
+    return answer, hits
+
+
+async def prepare_answer_context(
+    db: Session,
+    question: str,
+    knowledge_base_id: str | None,
+    image_description: str | None = None,
+    history: list[dict] | None = None,
+) -> tuple[list[dict], list[dict]]:
     history_query = "\n".join(item.get("content", "") for item in (history or [])[-4:] if item.get("role") == "user")
     retrieval_query = "\n".join(part for part in [history_query, question, image_description or ""] if part)
     hits = await retrieve(db, retrieval_query, knowledge_base_id)
-    provider = OpenAICompatibleProvider(active_model_config(db))
-    try:
-        answer = await provider.chat(build_prompt(question, hits, image_description, history))
-    except Exception as exc:
-        answer = f"""1. 可能原因
+    retrieval_terms = extract_retrieval_terms(retrieval_query)
+    for hit in hits:
+        hit["retrieval_terms"] = retrieval_terms
+    return build_prompt(question, hits, image_description, history), hits
+
+
+async def stream_answer_chunks(
+    db: Session,
+    question: str,
+    knowledge_base_id: str | None,
+    image_description: str | None = None,
+    history: list[dict] | None = None,
+) -> tuple[AsyncIterator[str], list[dict]]:
+    messages, hits = await prepare_answer_context(db, question, knowledge_base_id, image_description, history)
+    demo_mode = get_app_setting(db, "demo_mode", "fallback")
+    if demo_mode == "always":
+        async def demo_iter() -> AsyncIterator[str]:
+            yield demo_answer(question, hits, image_description)
+
+        return demo_iter(), hits
+
+    async def iterator() -> AsyncIterator[str]:
+        try:
+            async for chunk in stream_for_task(db, "chat", messages):
+                yield chunk
+        except Exception as exc:
+            try:
+                async for chunk in stream_for_task(db, "fallback_chat", messages):
+                    yield chunk
+            except Exception:
+                if demo_mode in ("fallback", "always"):
+                    yield demo_answer(question, hits, image_description)
+                else:
+                    yield _degraded_answer(exc, hits)
+
+    return iterator(), hits
+
+
+def _degraded_answer(exc: Exception, hits: list[dict]) -> str:
+    return f"""1. 可能原因
 模型调用失败，无法完成诊断。
 
 2. 检查步骤
@@ -227,4 +288,3 @@ async def answer_question(
 
 6. 置信提示
 低。当前回答为系统降级提示。"""
-    return answer, hits

@@ -16,3 +16,5 @@ tmp/
 coverage/
 playwright-report/
 test-results/
+apps/api/retrieval_eval*.csv
+apps/api/retrieval_eval*.json

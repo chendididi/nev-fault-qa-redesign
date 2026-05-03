@@ -53,6 +53,11 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./models:/app/models
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   worker:
     build:
@@ -71,6 +76,8 @@ services:
         condition: service_started
       minio:
         condition: service_started
+      api:
+        condition: service_healthy
     volumes:
       - ./uploads:/app/uploads
       - ./models:/app/models

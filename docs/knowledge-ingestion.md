@@ -18,6 +18,8 @@
 5. 调用本地 embedding 模型。
 6. 写入 `chunks` 表和 pgvector 向量索引，检索时再使用本地 rerank 模型精排。
 
+每个 chunk 会尽量写入可解释 metadata：资料标题、文件名、chunk 序号、页码、章节标题、系统名、DTC、车型和关键词。聊天页会把这些 metadata 与向量分数、rerank 分数、关键词命中一起展示为证据链，便于论文实验和答辩讲解。
+
 Embedding 不再调用远程 `/v1/embeddings`，也不再静默使用 fallback embedding。若本地模型未下载、依赖未安装或向量维度与数据库不一致，入库任务会失败并在文档状态中显示错误信息。
 
 默认模型：

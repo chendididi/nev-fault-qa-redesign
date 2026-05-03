@@ -12,6 +12,22 @@
 - Deployment: Docker Compose
 - Model interface: OpenAI-compatible chat/vision API plus local embedding/rerank models
 
+## Thesis and Defense Materials
+
+- Thesis/defense upgrade guide: `docs/thesis-defense-upgrade.md`
+- Knowledge ingestion guide: `docs/knowledge-ingestion.md`
+- Model configuration guide: `docs/model-config.md`
+- Retrieval evaluation cases: `apps/api/evaluation_cases.json`
+
+Run retrieval ablation evaluation after the knowledge base is indexed:
+
+```bash
+cd apps/api
+python evaluate_retrieval.py --variant all --limit 6 \
+  --out retrieval_eval_results.csv \
+  --summary-out retrieval_eval_summary.json
+```
+
 ## Quick Start
 
 1. Copy env files:
@@ -21,7 +37,7 @@ cp .env.example .env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-2. Configure model settings in `.env`, or log in as admin and update them in the model settings page. The remote API is used for `gpt-5.5` chat, image understanding and OCR; embedding/rerank models are local.
+2. Configure model settings in `.env`, or log in as admin and update them in the model settings page. The model page supports vLLM, Ollama, llama.cpp, LM Studio, third-party OpenAI-compatible APIs, local BGE retrieval models and Demo Cache fallback.
 
 3. Optionally pre-download local embedding/rerank models after installing API dependencies. If skipped, the API/worker downloads them lazily on first embedding/rerank use:
 
@@ -44,6 +60,12 @@ Recommended command for the current WSL/Docker environment, especially when Dock
 
 ```bash
 docker-compose -f docker-compose.yml -f docker-compose.cn.yml up -d --build
+```
+
+Use a fixed Compose project name when you need to reuse the existing local data volumes from a worktree:
+
+```bash
+docker compose -p nev-fault-qa-redesign -f docker-compose.yml -f docker-compose.cn.yml up -d --build
 ```
 
 This project uses `WEB_PORT` from `.env`. The current local default is:
@@ -87,6 +109,31 @@ Default accounts:
 - Technician: `tech@example.com` / `Tech123!`
 
 If port `3001` is also occupied, change `WEB_PORT` in `.env` and restart the stack.
+
+## School GPU Deployment
+
+For a single RTX 4090 school server, use the GPU override. It runs vLLM on host port `8008` with `Qwen/Qwen2.5-VL-7B-Instruct` served as `qwen-vl-demo`.
+
+```bash
+cp deploy/env.school.example .env
+# Edit SERVER_IP placeholders and secrets in .env first.
+bash deploy/deploy-school.sh
+```
+
+Export the current full demo dataset from this machine:
+
+```bash
+bash deploy/export-data.sh ./backup/nev-demo-$(date +%Y%m%d)
+```
+
+Restore it on the school server:
+
+```bash
+bash deploy/import-data.sh ./backup/nev-demo-YYYYMMDD
+bash deploy/deploy-school.sh
+```
+
+See `docs/deployment.md` and `docs/model-config.md` for endpoint routing and fallback details.
 
 ## Local Development
 

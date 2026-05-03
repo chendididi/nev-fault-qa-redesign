@@ -1,50 +1,465 @@
 [
   {
     "id": "dtc_fast_charge_hvil",
+    "category": "dtc",
     "question": "P1A0C 快充互锁异常怎么排查？",
     "expected_keywords": ["P1A0C", "快充", "互锁"],
-    "expected_documents": ["快充", "HVIL"]
+    "expected_documents": ["快充", "HVIL"],
+    "safety_terms": ["高压", "断电"]
   },
   {
     "id": "symptom_fast_charge_fail",
+    "category": "symptom",
     "question": "车辆无法快充，仪表提示充电系统故障，充电桩显示握手失败，优先检查什么？",
     "expected_keywords": ["快充", "充电系统故障", "握手失败"],
     "expected_documents": ["快充", "仪表"]
   },
   {
+    "id": "fast_charge_soc_not_rising",
+    "category": "symptom",
+    "question": "快充枪已锁止但 SOC 不上升，BMS 实际电流为 0A，应该怎么定位？",
+    "expected_keywords": ["SOC", "BMS", "0A", "快充"],
+    "expected_documents": ["快充", "BMS"]
+  },
+  {
+    "id": "fast_charge_can_dropout",
+    "category": "cross_system",
+    "question": "快充握手进入预充后中断，同时充电 CAN 报文计数停滞，可能原因是什么？",
+    "expected_keywords": ["快充", "CAN", "预充", "报文"],
+    "expected_documents": ["快充", "VCU", "CAN"]
+  },
+  {
+    "id": "fast_charge_port_water",
+    "category": "safety",
+    "question": "雨后快充口进水，仪表报充电系统故障，维修前必须做哪些安全处理？",
+    "expected_keywords": ["快充口", "进水", "安全", "高压"],
+    "expected_documents": ["快充", "事故车", "涉水"],
+    "safety_terms": ["高压", "断电", "绝缘"]
+  },
+  {
+    "id": "slow_charge_cp_cc_abnormal",
+    "category": "dtc",
+    "question": "P1A11 慢充 CP/CC 信号异常，如何区分慢充枪、慢充座和 OBC 问题？",
+    "expected_keywords": ["P1A11", "慢充", "CP", "CC", "OBC"],
+    "expected_documents": ["快充", "OBC"]
+  },
+  {
+    "id": "slow_charge_no_icon",
+    "category": "symptom",
+    "question": "交流慢充插枪后仪表没有充电图标，OBC 也没有工作声，下一步看哪些数据流？",
+    "expected_keywords": ["慢充", "仪表", "OBC", "数据流"],
+    "expected_documents": ["快充", "仪表", "OBC"]
+  },
+  {
+    "id": "charge_connector_overheat",
+    "category": "safety",
+    "question": "快充 10 分钟后端子温度升高且限流，是否可以继续测试？应该检查什么？",
+    "expected_keywords": ["快充", "端子", "温度", "限流"],
+    "expected_documents": ["快充", "热管理"],
+    "safety_terms": ["停止", "高压", "冷却"]
+  },
+  {
+    "id": "charge_lock_status_jump",
+    "category": "symptom",
+    "question": "晃动快充口线束时电子锁状态跳变，故障偶发，应该如何复核？",
+    "expected_keywords": ["电子锁", "快充口", "线束", "跳变"],
+    "expected_documents": ["快充", "HVIL"]
+  },
+  {
+    "id": "charge_pile_connected_only",
+    "category": "symptom",
+    "question": "充电桩只显示已连接但没有输出电流，车辆侧应优先确认哪些阶段？",
+    "expected_keywords": ["充电桩", "已连接", "输出电流", "BMS"],
+    "expected_documents": ["快充", "BMS"]
+  },
+  {
     "id": "insulation_low",
+    "category": "safety",
     "question": "BMS 报绝缘电阻低于 100kΩ，维修前安全步骤是什么？",
     "expected_keywords": ["BMS", "绝缘", "100kΩ", "安全"],
-    "expected_documents": ["BMS", "HVIL", "高压电池"]
+    "expected_documents": ["BMS", "HVIL", "高压电池"],
+    "safety_terms": ["高压", "断电", "绝缘"]
+  },
+  {
+    "id": "battery_cell_delta_high",
+    "category": "symptom",
+    "question": "动力电池单体压差过大，SOC 估算不稳定，应该看哪些数据流？",
+    "expected_keywords": ["动力电池", "单体", "压差", "SOC"],
+    "expected_documents": ["高压电池", "BMS"]
+  },
+  {
+    "id": "bms_temp_sensor_fault",
+    "category": "dtc",
+    "question": "BMS 温度传感器读数为 -40℃，车辆限制充电，排查路径是什么？",
+    "expected_keywords": ["BMS", "温度传感器", "-40℃", "限制充电"],
+    "expected_documents": ["BMS", "热管理"]
+  },
+  {
+    "id": "battery_precharge_timeout",
+    "category": "dtc",
+    "question": "高压上电预充超时，母线电压上升缓慢，可能原因和检测标准是什么？",
+    "expected_keywords": ["预充", "母线电压", "高压", "超时"],
+    "expected_documents": ["高压电池", "VCU"],
+    "safety_terms": ["高压", "断电"]
+  },
+  {
+    "id": "battery_contactor_not_close",
+    "category": "symptom",
+    "question": "READY 请求后主接触器不闭合，BMS 没有允许上电，如何判断根因？",
+    "expected_keywords": ["READY", "接触器", "BMS", "允许上电"],
+    "expected_documents": ["高压电池", "BMS", "VCU"]
+  },
+  {
+    "id": "bms_current_sensor_zero",
+    "category": "symptom",
+    "question": "车辆行驶时 BMS 电流传感器一直显示 0A，会影响哪些诊断？",
+    "expected_keywords": ["BMS", "电流传感器", "0A", "SOC"],
+    "expected_documents": ["BMS", "高压电池"]
+  },
+  {
+    "id": "battery_pack_water_alarm",
+    "category": "safety",
+    "question": "电池包涉水后报绝缘故障，拖回车间后第一步应该做什么？",
+    "expected_keywords": ["电池包", "涉水", "绝缘", "故障"],
+    "expected_documents": ["事故车", "涉水", "高压电池"],
+    "safety_terms": ["高压", "隔离", "绝缘"]
+  },
+  {
+    "id": "bms_cell_voltage_missing",
+    "category": "dtc",
+    "question": "某一组单体电压一直为 0V，其余正常，应该怀疑采样线还是电芯？",
+    "expected_keywords": ["单体电压", "0V", "采样线", "电芯"],
+    "expected_documents": ["BMS", "高压电池"]
+  },
+  {
+    "id": "battery_soc_jump",
+    "category": "symptom",
+    "question": "车辆 SOC 从 45% 突然跳到 20%，且近期快充频繁，如何排查？",
+    "expected_keywords": ["SOC", "跳变", "快充", "BMS"],
+    "expected_documents": ["BMS", "快充", "高压电池"]
+  },
+  {
+    "id": "battery_balance_issue",
+    "category": "symptom",
+    "question": "保养时发现电池均衡时间过长，单体最高最低压差偏大，应如何处理？",
+    "expected_keywords": ["均衡", "单体", "压差", "电池"],
+    "expected_documents": ["高压电池", "BMS"]
   },
   {
     "id": "ready_fail_12v_ok",
+    "category": "cross_system",
     "question": "车辆 READY 不上电，但 12V 电池电压正常，下一步应该查哪里？",
     "expected_keywords": ["READY", "12V", "唤醒"],
     "expected_documents": ["低压", "VCU"]
   },
   {
+    "id": "low_voltage_wakeup_fail",
+    "category": "symptom",
+    "question": "按启动键后仪表点亮但高压不上电，低压唤醒链路怎么查？",
+    "expected_keywords": ["仪表", "高压不上电", "低压", "唤醒"],
+    "expected_documents": ["低压", "VCU", "仪表"]
+  },
+  {
     "id": "can_offline",
+    "category": "cross_system",
     "question": "多个控制器离线并报 CAN 通讯故障，如何定位故障范围？",
     "expected_keywords": ["CAN", "通讯", "离线"],
     "expected_documents": ["VCU", "CAN"]
   },
   {
+    "id": "can_short_to_ground",
+    "category": "dtc",
+    "question": "CAN-H 对地电压异常，多个模块偶发离线，怎样区分短路和模块拖总线？",
+    "expected_keywords": ["CAN-H", "对地", "短路", "离线"],
+    "expected_documents": ["VCU", "CAN"]
+  },
+  {
+    "id": "vcu_no_ready_due_to_brake",
+    "category": "symptom",
+    "question": "踩刹车按启动后 READY 不出现，VCU 数据流中应该检查哪些条件？",
+    "expected_keywords": ["VCU", "READY", "刹车", "数据流"],
+    "expected_documents": ["VCU", "低压"]
+  },
+  {
+    "id": "low_voltage_battery_drop",
+    "category": "symptom",
+    "question": "12V 静态电压正常但启动瞬间跌到 8V，会导致哪些新能源系统故障？",
+    "expected_keywords": ["12V", "启动", "8V", "低压"],
+    "expected_documents": ["低压", "VCU", "仪表"]
+  },
+  {
+    "id": "gateway_offline_after_repair",
+    "category": "case",
+    "question": "事故维修后网关离线，诊断仪无法扫描多个控制器，排查顺序是什么？",
+    "expected_keywords": ["网关", "离线", "事故", "控制器"],
+    "expected_documents": ["事故车", "VCU", "CAN"]
+  },
+  {
+    "id": "wake_after_sleep_fail",
+    "category": "symptom",
+    "question": "车辆休眠后偶发无法唤醒，解锁无反应但搭电后恢复，如何定位？",
+    "expected_keywords": ["休眠", "唤醒", "搭电", "低压"],
+    "expected_documents": ["低压", "VCU"]
+  },
+  {
+    "id": "can_terminal_resistance",
+    "category": "dtc",
+    "question": "诊断 CAN 终端电阻测得 120Ω，而不是约 60Ω，说明什么？",
+    "expected_keywords": ["CAN", "终端电阻", "120Ω", "60Ω"],
+    "expected_documents": ["VCU", "CAN"]
+  },
+  {
+    "id": "vcu_charge_wakeup",
+    "category": "cross_system",
+    "question": "慢充枪插入后 OBC 无唤醒，VCU 充电唤醒线和低压供电怎么查？",
+    "expected_keywords": ["OBC", "唤醒", "VCU", "低压"],
+    "expected_documents": ["OBC", "VCU", "低压"]
+  },
+  {
     "id": "mcu_overheat_derating",
+    "category": "cross_system",
     "question": "电机控制器温度 95℃ 且车辆限扭，怎么判断是水泵还是传感器问题？",
     "expected_keywords": ["电机控制器", "95℃", "限扭", "水泵"],
     "expected_documents": ["驱动电机", "热管理"]
   },
   {
+    "id": "drive_motor_resolver_fault",
+    "category": "dtc",
+    "question": "驱动电机旋变信号异常，车辆抖动并限扭，应该检查哪些连接器和数据？",
+    "expected_keywords": ["驱动电机", "旋变", "限扭", "连接器"],
+    "expected_documents": ["驱动电机", "MCU"]
+  },
+  {
+    "id": "mcu_phase_current_unbalance",
+    "category": "symptom",
+    "question": "加速时三相电流不平衡，MCU 没有立即报故障，如何判断电机还是逆变器问题？",
+    "expected_keywords": ["三相电流", "MCU", "电机", "逆变器"],
+    "expected_documents": ["驱动电机", "MCU"]
+  },
+  {
+    "id": "thermal_pump_no_flow",
+    "category": "symptom",
+    "question": "热管理水泵有供电但冷却液无流量，电驱过温，下一步怎么查？",
+    "expected_keywords": ["热管理", "水泵", "冷却液", "过温"],
+    "expected_documents": ["热管理", "驱动电机"]
+  },
+  {
+    "id": "thermal_battery_cold_limit",
+    "category": "symptom",
+    "question": "低温环境下动力电池限制快充功率，热管理系统应该检查哪些部件？",
+    "expected_keywords": ["低温", "动力电池", "快充", "热管理"],
+    "expected_documents": ["热管理", "高压电池", "快充"]
+  },
+  {
+    "id": "coolant_leak_high_voltage",
+    "category": "safety",
+    "question": "电驱冷却液泄漏到高压部件附近，是否可以直接上电验证？",
+    "expected_keywords": ["冷却液", "泄漏", "高压", "上电"],
+    "expected_documents": ["热管理", "事故车", "驱动电机"],
+    "safety_terms": ["禁止", "高压", "绝缘"]
+  },
+  {
+    "id": "motor_noise_after_water",
+    "category": "case",
+    "question": "涉水后驱动电机异响且绝缘报警，如何制定检查步骤？",
+    "expected_keywords": ["涉水", "驱动电机", "异响", "绝缘"],
+    "expected_documents": ["事故车", "涉水", "驱动电机"],
+    "safety_terms": ["高压", "绝缘"]
+  },
+  {
+    "id": "mcu_dc_bus_overvoltage",
+    "category": "dtc",
+    "question": "MCU 报直流母线过压，车辆制动能量回收异常，应该看哪些信号？",
+    "expected_keywords": ["MCU", "母线", "过压", "能量回收"],
+    "expected_documents": ["驱动电机", "高压电池"]
+  },
+  {
+    "id": "thermal_fan_not_start",
+    "category": "symptom",
+    "question": "电池温度升高但冷却风扇不启动，是热管理控制还是低压供电问题？",
+    "expected_keywords": ["电池温度", "风扇", "热管理", "低压"],
+    "expected_documents": ["热管理", "低压"]
+  },
+  {
     "id": "obc_soc_not_rising",
+    "category": "cross_system",
     "question": "慢充时 SOC 不上升，可能是 OBC 还是 BMS 问题？",
     "expected_keywords": ["慢充", "SOC", "OBC", "BMS"],
     "expected_documents": ["OBC", "BMS"]
   },
   {
+    "id": "dcdc_no_12v_charge",
+    "category": "dtc",
+    "question": "READY 后 12V 电压仍然只有 12.1V，怀疑 DC/DC 不工作，如何确认？",
+    "expected_keywords": ["READY", "12V", "DC/DC", "电压"],
+    "expected_documents": ["OBC", "DCDC", "低压"]
+  },
+  {
+    "id": "obc_input_ac_missing",
+    "category": "symptom",
+    "question": "慢充时 OBC 输入端没有交流电压，如何区分墙盒、慢充座和线束问题？",
+    "expected_keywords": ["OBC", "交流电压", "慢充座", "线束"],
+    "expected_documents": ["OBC", "快充"]
+  },
+  {
+    "id": "dcdc_overtemp",
+    "category": "symptom",
+    "question": "DC/DC 过温后低压报警，热管理和负载侧怎么排查？",
+    "expected_keywords": ["DC/DC", "过温", "低压", "热管理"],
+    "expected_documents": ["OBC", "热管理", "低压"]
+  },
+  {
+    "id": "obc_isolation_fault",
+    "category": "safety",
+    "question": "OBC 内部绝缘故障，慢充跳闸，维修时有哪些禁止操作？",
+    "expected_keywords": ["OBC", "绝缘", "慢充", "跳闸"],
+    "expected_documents": ["OBC", "HVIL"],
+    "safety_terms": ["禁止", "高压", "断电"]
+  },
+  {
+    "id": "dcdc_output_ripple",
+    "category": "symptom",
+    "question": "低压系统灯光闪烁，怀疑 DC/DC 输出纹波过大，如何验证？",
+    "expected_keywords": ["低压", "DC/DC", "纹波", "灯光"],
+    "expected_documents": ["OBC", "低压"]
+  },
+  {
+    "id": "obc_no_wakeup_after_charge",
+    "category": "cross_system",
+    "question": "插入慢充枪后 OBC 没有唤醒，仪表也无充电提示，可能涉及哪些控制器？",
+    "expected_keywords": ["慢充", "OBC", "唤醒", "仪表"],
+    "expected_documents": ["OBC", "VCU", "仪表"]
+  },
+  {
+    "id": "dcdc_enable_signal_missing",
+    "category": "dtc",
+    "question": "DC/DC 使能信号缺失但高压电池正常，应该从 VCU 还是低压侧开始查？",
+    "expected_keywords": ["DC/DC", "使能", "VCU", "低压"],
+    "expected_documents": ["OBC", "VCU", "低压"]
+  },
+  {
+    "id": "obc_after_replacement_config",
+    "category": "case",
+    "question": "更换 OBC 后慢充仍失败，是否需要配置或学习？还要复核哪些项目？",
+    "expected_keywords": ["更换", "OBC", "慢充", "复核"],
+    "expected_documents": ["OBC", "典型维修案例"]
+  },
+  {
+    "id": "hvil_open_after_service",
+    "category": "dtc",
+    "question": "保养后报 HVIL 高压互锁断开，但车辆没有拆高压件，可能漏了什么？",
+    "expected_keywords": ["HVIL", "高压互锁", "断开", "保养"],
+    "expected_documents": ["HVIL", "高压电池"],
+    "safety_terms": ["高压", "断电"]
+  },
+  {
+    "id": "insulation_rainy_day",
+    "category": "safety",
+    "question": "雨天后绝缘报警复现，晴天又消失，应该优先检查哪些部位？",
+    "expected_keywords": ["雨天", "绝缘", "报警", "进水"],
+    "expected_documents": ["HVIL", "事故车", "涉水"],
+    "safety_terms": ["绝缘", "高压"]
+  },
+  {
     "id": "flooded_vehicle_safety",
+    "category": "safety",
     "question": "涉水车高压系统报警，交车前必须检查哪些项目？",
     "expected_keywords": ["涉水", "高压", "安全", "绝缘"],
-    "expected_documents": ["涉水", "事故车"]
+    "expected_documents": ["涉水", "事故车"],
+    "safety_terms": ["高压", "绝缘", "交车"]
+  },
+  {
+    "id": "collision_hv_check",
+    "category": "safety",
+    "question": "事故车前舱维修后准备上电，必须先完成哪些高压安全检查？",
+    "expected_keywords": ["事故车", "前舱", "上电", "高压安全"],
+    "expected_documents": ["事故车", "HVIL", "高压电池"],
+    "safety_terms": ["高压", "绝缘", "上电"]
+  },
+  {
+    "id": "hvil_bypass_risk",
+    "category": "safety",
+    "question": "为了临时移车能不能短接 HVIL 让车辆 READY？正确说法是什么？",
+    "expected_keywords": ["HVIL", "短接", "READY", "禁止"],
+    "expected_documents": ["HVIL", "安全"],
+    "safety_terms": ["禁止", "高压", "安全"]
+  },
+  {
+    "id": "insulation_meter_usage",
+    "category": "safety",
+    "question": "使用绝缘电阻表测高压系统时，测量前后要注意哪些事项？",
+    "expected_keywords": ["绝缘电阻表", "高压", "测量", "注意"],
+    "expected_documents": ["HVIL", "高压电池"],
+    "safety_terms": ["断电", "绝缘", "高压"]
+  },
+  {
+    "id": "after_water_delivery_check",
+    "category": "case",
+    "question": "涉水车维修完成后交车复核，要记录哪些项目才能降低返修风险？",
+    "expected_keywords": ["涉水车", "交车", "复核", "返修"],
+    "expected_documents": ["事故车", "涉水", "典型维修案例"]
+  },
+  {
+    "id": "hvil_connector_lock",
+    "category": "symptom",
+    "question": "高压连接器二次锁没有锁到位，会造成哪些互锁现象？怎么检查？",
+    "expected_keywords": ["高压连接器", "二次锁", "互锁", "检查"],
+    "expected_documents": ["HVIL", "高压电池"]
+  },
+  {
+    "id": "instrument_power_limited",
+    "category": "ocr",
+    "question": "图片中仪表显示“动力受限”，同时有黄色高压故障灯，应该检索哪些系统？",
+    "expected_keywords": ["仪表", "动力受限", "高压", "故障灯"],
+    "expected_documents": ["仪表", "驱动电机", "高压电池"]
+  },
+  {
+    "id": "instrument_charge_fault",
+    "category": "ocr",
+    "question": "仪表截图提示“充电系统故障，请检修”，没有故障码时如何提问和补充信息？",
+    "expected_keywords": ["仪表", "充电系统故障", "故障码", "补充"],
+    "expected_documents": ["仪表", "快充"]
+  },
+  {
+    "id": "case_repeat_fast_charge",
+    "category": "case",
+    "question": "同一车辆连续两次更换快充座仍复发 P1A0C，案例库里应关注什么？",
+    "expected_keywords": ["案例", "快充座", "P1A0C", "复发"],
+    "expected_documents": ["典型维修案例", "快充", "HVIL"]
+  },
+  {
+    "id": "case_customer_complaint_range_drop",
+    "category": "case",
+    "question": "客户抱怨续航突然下降，但没有当前故障码，维修案例应如何引导诊断？",
+    "expected_keywords": ["客户抱怨", "续航", "故障码", "诊断"],
+    "expected_documents": ["典型维修案例", "BMS", "高压电池"]
+  },
+  {
+    "id": "ocr_fault_code_from_photo",
+    "category": "ocr",
+    "question": "诊断仪照片里能看到 P1A10 和 BMS 充电禁止，系统应该如何利用图片文字？",
+    "expected_keywords": ["诊断仪", "P1A10", "BMS", "图片"],
+    "expected_documents": ["快充", "BMS", "仪表"]
+  },
+  {
+    "id": "dashboard_ready_not_displayed",
+    "category": "ocr",
+    "question": "仪表没有 READY 但低压灯正常点亮，如何从用户现象对照到 VCU 和低压检查？",
+    "expected_keywords": ["仪表", "READY", "低压", "VCU"],
+    "expected_documents": ["仪表", "VCU", "低压"]
+  },
+  {
+    "id": "case_after_dcdc_replace",
+    "category": "case",
+    "question": "更换 DC/DC 后 12V 仍不充电，历史维修案例中还要看哪些遗漏项？",
+    "expected_keywords": ["DC/DC", "12V", "维修案例", "遗漏"],
+    "expected_documents": ["典型维修案例", "OBC", "低压"]
+  },
+  {
+    "id": "multi_turn_followup_next_step",
+    "category": "cross_system",
+    "question": "前面已经确认快充口无进水，下一步应该测 VCU 互锁输入还是 BMS 数据流？",
+    "expected_keywords": ["快充口", "VCU", "互锁输入", "BMS"],
+    "expected_documents": ["快充", "HVIL", "BMS"]
   }
 ]

@@ -1,9 +1,15 @@
 import { Nav } from "@/components/nav";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+type AppShellProps = {
+  children: React.ReactNode;
+  navigationLocked?: boolean;
+  navigationLockMessage?: string;
+};
+
+export function AppShell({ children, navigationLocked = false, navigationLockMessage }: AppShellProps) {
   return (
     <div className="app-shell">
-      <Nav />
+      <Nav locked={navigationLocked} lockMessage={navigationLockMessage} />
       <main className="app-content">{children}</main>
     </div>
   );

@@ -52,6 +52,39 @@ def _init_db_locked(db: Session, settings) -> None:
         )
     """))
     db.execute(text("""
+        CREATE TABLE IF NOT EXISTS model_endpoints (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            name text NOT NULL,
+            provider_type text NOT NULL DEFAULT 'remote_api',
+            base_url text NOT NULL DEFAULT '',
+            api_key text NOT NULL DEFAULT '',
+            capabilities jsonb NOT NULL DEFAULT '[]'::jsonb,
+            timeout_seconds integer NOT NULL DEFAULT 120,
+            is_active boolean NOT NULL DEFAULT true,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        )
+    """))
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS model_routes (
+            task text PRIMARY KEY,
+            endpoint_id uuid REFERENCES model_endpoints(id) ON DELETE SET NULL,
+            model_name text NOT NULL DEFAULT '',
+            temperature double precision NOT NULL DEFAULT 0.2,
+            max_tokens integer,
+            enabled boolean NOT NULL DEFAULT true,
+            updated_at timestamptz NOT NULL DEFAULT now(),
+            CHECK (task IN ('chat','vision_ocr','embedding','rerank','fallback_chat'))
+        )
+    """))
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key text PRIMARY KEY,
+            value text NOT NULL,
+            updated_at timestamptz NOT NULL DEFAULT now()
+        )
+    """))
+    db.execute(text("""
         CREATE TABLE IF NOT EXISTS knowledge_bases (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             name text NOT NULL,
@@ -130,6 +163,16 @@ def _init_db_locked(db: Session, settings) -> None:
         )
     """))
     db.execute(text("""
+        CREATE TABLE IF NOT EXISTS image_descriptions (
+            sha256 text PRIMARY KEY,
+            content_type text NOT NULL,
+            object_key text,
+            description text NOT NULL,
+            provider text NOT NULL DEFAULT '',
+            created_at timestamptz NOT NULL DEFAULT now()
+        )
+    """))
+    db.execute(text("""
         CREATE TABLE IF NOT EXISTS audit_logs (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id uuid REFERENCES users(id),
@@ -139,6 +182,7 @@ def _init_db_locked(db: Session, settings) -> None:
         )
     """))
     _seed(db, settings)
+    _seed_model_routing(db, settings)
 
 
 def _ensure_chunk_vector_dim(db: Session, embedding_dim: int) -> None:
@@ -196,3 +240,78 @@ def _seed(db: Session, settings) -> None:
             "rerank_model": settings.local_rerank_model,
             "embedding_dim": settings.embedding_dim,
         })
+
+
+def _seed_model_routing(db: Session, settings) -> None:
+    db.execute(text("""
+        INSERT INTO app_settings (key, value)
+        VALUES ('demo_mode', 'fallback')
+        ON CONFLICT (key) DO NOTHING
+    """))
+
+    active_config = db.execute(text("""
+        SELECT base_url, api_key, chat_model, embedding_model, vision_model, rerank_model, embedding_dim
+        FROM model_configs
+        WHERE is_active=true
+        ORDER BY updated_at DESC
+        LIMIT 1
+    """)).mappings().first()
+
+    remote_endpoint_id = db.execute(text("""
+        SELECT id FROM model_endpoints
+        WHERE provider_type IN ('remote_api','vllm','ollama','llama_cpp','lm_studio')
+        ORDER BY created_at ASC
+        LIMIT 1
+    """)).scalar()
+    if not remote_endpoint_id and active_config:
+        remote_provider_type = "vllm" if "vllm" in active_config["base_url"] else "remote_api"
+        remote_endpoint_id = db.execute(text("""
+            INSERT INTO model_endpoints
+            (name, provider_type, base_url, api_key, capabilities, timeout_seconds, is_active)
+            VALUES ('默认 OpenAI-compatible', :provider_type, :base_url, :api_key, '["chat","vision"]'::jsonb, 120, true)
+            RETURNING id
+        """), {
+            "base_url": active_config["base_url"],
+            "api_key": active_config["api_key"],
+            "provider_type": remote_provider_type,
+        }).scalar_one()
+
+    local_endpoint_id = db.execute(text("""
+        SELECT id FROM model_endpoints WHERE provider_type='local' ORDER BY created_at ASC LIMIT 1
+    """)).scalar()
+    if not local_endpoint_id:
+        local_endpoint_id = db.execute(text("""
+            INSERT INTO model_endpoints
+            (name, provider_type, base_url, api_key, capabilities, timeout_seconds, is_active)
+            VALUES ('本地 BGE 检索模型', 'local', '', '', '["embedding","rerank"]'::jsonb, 120, true)
+            RETURNING id
+        """)).scalar_one()
+
+    demo_endpoint_id = db.execute(text("""
+        SELECT id FROM model_endpoints WHERE provider_type='demo_cache' ORDER BY created_at ASC LIMIT 1
+    """)).scalar()
+    if not demo_endpoint_id:
+        demo_endpoint_id = db.execute(text("""
+            INSERT INTO model_endpoints
+            (name, provider_type, base_url, api_key, capabilities, timeout_seconds, is_active)
+            VALUES ('Demo Cache 演示兜底', 'demo_cache', '', '', '["chat","vision"]'::jsonb, 5, true)
+            RETURNING id
+        """)).scalar_one()
+
+    chat_model = (active_config or {}).get("chat_model") or settings.openai_chat_model
+    vision_model = (active_config or {}).get("vision_model") or chat_model
+    embedding_model = (active_config or {}).get("embedding_model") or settings.local_embedding_model
+    rerank_model = (active_config or {}).get("rerank_model") or settings.local_rerank_model
+
+    for task, endpoint_id, model_name in [
+        ("chat", remote_endpoint_id, chat_model),
+        ("vision_ocr", remote_endpoint_id, vision_model),
+        ("embedding", local_endpoint_id, embedding_model),
+        ("rerank", local_endpoint_id, rerank_model),
+        ("fallback_chat", demo_endpoint_id, "demo-cache"),
+    ]:
+        db.execute(text("""
+            INSERT INTO model_routes (task, endpoint_id, model_name, temperature, enabled)
+            VALUES (:task, :endpoint_id, :model_name, 0.2, true)
+            ON CONFLICT (task) DO NOTHING
+        """), {"task": task, "endpoint_id": endpoint_id, "model_name": model_name or ""})

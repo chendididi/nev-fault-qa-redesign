@@ -1,27 +1,54 @@
 # 模型配置
 
-系统采用混合模型架构：OpenAI-compatible 接口负责对话、图片理解和 OCR，本地模型负责 embedding 和 rerank。
+系统现在采用“端点 + 路由”的模型架构：端点负责连接 vLLM、Ollama、llama.cpp、LM Studio 或第三方 OpenAI-compatible API；路由负责决定聊天、图片理解、embedding、rerank 和 fallback 各用哪个模型。
 
-必填项：
+## 推荐演示配置
 
-- `base_url`：兼容接口地址。本地开发示例：`http://127.0.0.1:8317/v1`；Docker 示例：`http://host.docker.internal:8317/v1`。
-- `api_key`：远程大模型 API key。
-- `chat_model`：诊断问答模型，默认 `gpt-5.5`。
-- `embedding_model`：本地向量化模型，默认 `BAAI/bge-m3`。
-- `rerank_model`：本地精排模型，默认 `BAAI/bge-reranker-v2-m3`。
-- `embedding_dim`：pgvector 列维度，`BAAI/bge-m3` 默认 `1024`。
+学校单张 4090 服务器推荐跑 vLLM：
 
-可选项：
-
-- `vision_model`：图片理解/OCR 模型。留空时复用 `chat_model`。
-- `LOCAL_MODEL_SOURCE`：本地模型来源，默认 `modelscope`，也支持 `huggingface` 或 `local`。
-- `LOCAL_MODEL_CACHE_DIR`：本地模型缓存目录，Docker 默认 `/app/models`。
-- `LOCAL_DEVICE`：`auto`、`cpu` 或 `cuda`。
-
-注意：如果修改 `embedding_dim`，需要新建数据库或迁移 `chunks.embedding` 列维度，并重建知识库索引。
-
-下载默认本地模型：
-
-```bash
-python3 scripts/download_models.py
+```env
+VLLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
+VLLM_SERVED_MODEL_NAME=qwen-vl-demo
+VLLM_PORT=8008
+VLLM_API_KEY=change-me-vllm-key
 ```
+
+应用后台配置：
+
+- 端点类型：`vllm`
+- Base URL：`http://学校服务器IP:8008/v1`
+- API Key：与 `VLLM_API_KEY` 一致
+- 主聊天路由：`qwen-vl-demo`
+- 图片理解/OCR 路由：`qwen-vl-demo`
+- Fallback 路由：`Demo Cache` 或第三方远端 API
+
+## 端点类型
+
+- `remote_api`：第三方 OpenAI-compatible API。
+- `vllm`：学校 GPU 或云 GPU 上的 vLLM OpenAI server。
+- `ollama`：本机轻量模型服务，API Key 可留空。
+- `llama_cpp`：GGUF/边缘部署，API Key 可留空。
+- `lm_studio`：本地桌面模型服务。
+- `local`：当前 API 容器内的 BGE embedding/rerank。
+- `demo_cache`：预置演示兜底，不依赖真实模型。
+
+## Demo Mode
+
+- `真实模型优先，失败后 Demo Cache`：推荐演示默认值。
+- `只使用真实模型`：用于验收真实推理能力。
+- `始终使用 Demo Cache`：用于无 GPU、无外网或答辩前端展示。
+
+Demo Cache 会明确在回答里标记“演示模式结果”，避免和真实维修推理混淆。
+
+## 本地检索模型
+
+默认仍使用：
+
+```env
+LOCAL_MODEL_SOURCE=modelscope
+LOCAL_EMBEDDING_MODEL=BAAI/bge-m3
+LOCAL_RERANK_MODEL=BAAI/bge-reranker-v2-m3
+EMBEDDING_DIM=1024
+```
+
+如果修改 `EMBEDDING_DIM`，需要清空或迁移 `chunks.embedding` 并重建知识库索引。

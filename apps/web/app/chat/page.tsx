@@ -1,25 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { BrainCircuit, History, ImagePlus, MessageSquarePlus, Plus, Search, Send, Sparkles } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { BrainCircuit, FileSearch, History, ImagePlus, ListChecks, MessageSquarePlus, Plus, Search, Send, ShieldCheck, Sparkles, Trash2, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/shell";
 import { ApiError, api } from "@/lib/api";
+import { clearChatTask, getChatTaskSnapshot, startChatTask, subscribeChatTask, type ChatMessage as Message, type Citation } from "@/lib/background-tasks";
 
 type KB = { id: string; name: string };
-type CitationMetadata = { page?: number; heading?: string; system?: string[]; dtc?: string[]; vehicle_model?: string; keywords?: string[] };
-type Citation = {
-  id: string;
-  score: number;
-  vector_score?: number;
-  rerank_score?: number;
-  keyword_matches?: string[];
-  sources?: string[];
-  metadata?: CitationMetadata;
-  content: string;
-  title: string;
-  filename: string;
-};
-type Message = { role: "user" | "assistant"; content: string; citations?: Citation[]; imageDescription?: string | null };
 type ApiMessage = { role: "user" | "assistant" | "system"; content: string; citations?: Citation[] };
 type Conversation = {
   id: string;
@@ -28,7 +15,7 @@ type Conversation = {
   message_count: number;
   updated_at: string;
 };
-type PendingStep = { label: string; icon: typeof Search };
+type PendingStep = { label: string; icon: LucideIcon };
 
 const textPendingSteps: PendingStep[] = [
   {label: "正在检索知识库", icon: Search},
@@ -49,11 +36,14 @@ export default function ChatPage() {
   const [question, setQuestion] = useState("车辆无法快充，仪表提示充电系统故障，应该如何排查？");
   const [image, setImage] = useState<File | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [pendingHasImage, setPendingHasImage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const chatTask = useSyncExternalStore(subscribeChatTask, getChatTaskSnapshot, getChatTaskSnapshot);
+  const loading = chatTask.status === "running";
+  const pendingHasImage = chatTask.pendingHasImage;
+  const handledCompletionRef = useRef<number | null>(null);
 
   useEffect(() => {
     api<{items: KB[]}>("/api/knowledge-bases").then((data) => {
@@ -64,18 +54,30 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
+    if (chatTask.status === "idle" || chatTask.messages.length === 0) return;
+    setMessages(chatTask.messages);
+    setSessionId(chatTask.sessionId);
+    if (chatTask.completedAt && handledCompletionRef.current !== chatTask.completedAt) {
+      handledCompletionRef.current = chatTask.completedAt;
+      void loadConversations();
+    }
+  }, [chatTask]);
+
+  useEffect(() => {
     if (!loading) {
       setElapsedSeconds(0);
       return;
     }
 
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
+    const startedAt = chatTask.startedAt || Date.now();
+    const updateElapsed = () => {
       setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    }, 250);
+    };
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 250);
 
     return () => window.clearInterval(timer);
-  }, [loading]);
+  }, [loading, chatTask.startedAt]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({behavior: "smooth", block: "end"});
@@ -84,27 +86,17 @@ export default function ChatPage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     const text = question.trim();
-    if (!text) return;
-    setLoading(true);
-    setPendingHasImage(Boolean(image));
-    const form = new FormData();
-    form.set("question", text);
-    if (knowledgeBaseId) form.set("knowledge_base_id", knowledgeBaseId);
-    if (sessionId) form.set("session_id", sessionId);
-    if (image) form.set("image", image);
-    setMessages((prev) => [...prev, {role: "user", content: text}]);
-    try {
-      const data = await api<{session_id: string; answer: string; image_description?: string | null; citations: Citation[]}>("/api/chat", {method: "POST", body: form});
-      setSessionId(data.session_id);
-      setMessages((prev) => [...prev, {role: "assistant", content: data.answer, citations: data.citations, imageDescription: data.image_description}]);
+    if (!text || loading) return;
+    const started = startChatTask({
+      question: text,
+      knowledgeBaseId,
+      sessionId,
+      image,
+      messages,
+    });
+    if (started) {
       setQuestion("");
       setImage(null);
-      await loadConversations();
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) return;
-      setMessages((prev) => [...prev, {role: "assistant", content: err instanceof Error ? err.message : "请求失败"}]);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -122,6 +114,7 @@ export default function ChatPage() {
     setHistoryLoading(true);
     try {
       const data = await api<{items: ApiMessage[]}>(`/api/chat/sessions/${id}/messages`);
+      clearChatTask();
       setSessionId(id);
       setMessages(data.items.filter((item) => item.role !== "system").map((item) => ({
         role: item.role as "user" | "assistant",
@@ -137,13 +130,42 @@ export default function ChatPage() {
     }
   }
 
+  async function deleteConversation(id: string, title: string) {
+    if (loading && id === sessionId) return;
+    const label = title || "新的诊断会话";
+    if (!window.confirm(`确定删除「${label}」吗？该历史对话和引用记录会一起删除。`)) return;
+
+    setDeletingSessionId(id);
+    try {
+      await api(`/api/chat/sessions/${id}`, {method: "DELETE"});
+      setConversations((prev) => prev.filter((conversation) => conversation.id !== id));
+      if (id === sessionId) {
+        clearChatTask();
+        setSessionId("");
+        setMessages([]);
+        setImage(null);
+        setQuestion("");
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) return;
+      setMessages((prev) => [...prev, {role: "assistant", content: err instanceof Error ? err.message : "删除历史会话失败"}]);
+    } finally {
+      setDeletingSessionId("");
+    }
+  }
+
   function startNewConversation() {
     if (loading) return;
+    clearChatTask();
     setSessionId("");
     setMessages([]);
     setImage(null);
     setQuestion("");
   }
+
+  const latestAssistantMessage = [...messages].reverse().find((message) => (
+    message.role === "assistant" && Boolean(message.citations?.length)
+  ));
 
   return (
     <AppShell>
@@ -183,20 +205,33 @@ export default function ChatPage() {
             ) : (
               <div className="space-y-2">
                 {conversations.map((conversation) => (
-                  <button
+                  <div
                     key={conversation.id}
-                    type="button"
-                    disabled={loading || historyLoading}
-                    onClick={() => loadConversation(conversation.id)}
-                    className={`w-full rounded-md border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${conversation.id === sessionId ? "border-teal-200 bg-teal-50" : "border-line bg-white hover:bg-slate-50"}`}
+                    className={`group flex items-stretch gap-2 rounded-md border p-2 transition ${conversation.id === sessionId ? "border-teal-200 bg-teal-50" : "border-line bg-white hover:bg-slate-50"}`}
                   >
-                    <div className="line-clamp-1 text-sm font-semibold text-slate-800">{conversation.title || "新的诊断会话"}</div>
-                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{conversation.last_message || "空会话"}</div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                      <span>{conversation.message_count} 条</span>
-                      <span>{formatConversationTime(conversation.updated_at)}</span>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      disabled={loading || historyLoading || deletingSessionId === conversation.id}
+                      onClick={() => loadConversation(conversation.id)}
+                      className="min-w-0 flex-1 rounded px-1 py-1 text-left disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <div className="line-clamp-1 text-sm font-semibold text-slate-800">{conversation.title || "新的诊断会话"}</div>
+                      <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{conversation.last_message || "空会话"}</div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+                        <span>{conversation.message_count} 条</span>
+                        <span>{formatConversationTime(conversation.updated_at)}</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={(loading && conversation.id === sessionId) || deletingSessionId === conversation.id}
+                      onClick={() => deleteConversation(conversation.id, conversation.title)}
+                      className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-100 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40 md:opacity-0 md:group-hover:opacity-100"
+                      title="删除对话"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -230,6 +265,11 @@ export default function ChatPage() {
                     </div>
                   )}
                   {message.role === "assistant" ? <DiagnosticCards content={message.content} /> : <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{message.content}</pre>}
+                  {message.role === "assistant" && message.citations?.length ? (
+                    <div className="mt-3 xl:hidden">
+                      <EvidenceTracePanel message={message} compact />
+                    </div>
+                  ) : null}
                 </article>
               ))}
               {loading && <PendingAssistantMessage elapsedSeconds={elapsedSeconds} hasImage={pendingHasImage} />}
@@ -251,12 +291,22 @@ export default function ChatPage() {
             {image && <div className="mx-auto mt-2 max-w-4xl text-xs text-slate-500">已选择图片：{image.name}</div>}
           </form>
         </section>
-        <aside className="hidden w-96 border-l border-line bg-white p-5 xl:block">
-          <h2 className="text-sm font-semibold">最近引用</h2>
-          <div className="mt-4 space-y-3">
-            {messages.flatMap((m) => m.citations || []).slice(-6).map((citation) => (
-              <CitationEvidenceCard key={citation.id} citation={citation} />
-            ))}
+        <aside className="hidden h-full min-h-0 w-96 flex-col overflow-hidden border-l border-line bg-white p-5 xl:flex">
+          <div className="shrink-0">
+            <EvidenceTracePanel message={latestAssistantMessage} />
+          </div>
+          <div className="mt-5 flex min-h-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-between">
+              <h2 className="text-sm font-semibold">最近引用</h2>
+              <span className="text-xs text-slate-400">{messages.flatMap((m) => m.citations || []).length} 条</span>
+            </div>
+            <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="space-y-3 pb-1">
+                {messages.flatMap((m) => m.citations || []).slice(-6).map((citation) => (
+                  <CitationEvidenceCard key={citation.id} citation={citation} />
+                ))}
+              </div>
+            </div>
           </div>
         </aside>
       </div>
@@ -281,6 +331,62 @@ function DiagnosticCards({content}: {content: string}) {
   );
 }
 
+function EvidenceTracePanel({message, compact = false}: {message?: Message; compact?: boolean}) {
+  const citations = message?.citations || [];
+  const topCitation = citations[0];
+  const terms = evidenceTerms(citations);
+  const sourceLabel = topCitation ? (topCitation.sources || []).join(" + ") || "vector" : "-";
+  const metadataLabel = topCitation ? formatMetadataLabel(topCitation) : "-";
+  const topScore = topCitation ? formatScore(topCitation.rerank_score ?? topCitation.score) : "-";
+
+  if (!message && compact) return null;
+
+  return (
+    <section className={`rounded-md border border-line bg-white ${compact ? "p-3" : "p-4"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <FileSearch className="h-4 w-4 text-accent" />
+          <h2 className="text-sm font-semibold">证据链</h2>
+        </div>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+          {citations.length || 0} 条引用
+        </span>
+      </div>
+      {citations.length === 0 ? (
+        <div className="mt-3 rounded-md border border-dashed border-line p-3 text-xs leading-5 text-slate-500">
+          暂无可展示证据
+        </div>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <TraceRow icon={Search} label="检索关键词" value={terms.join(" / ") || "-"} />
+          <TraceRow icon={BrainCircuit} label="召回方式" value={sourceLabel} />
+          <TraceRow icon={ListChecks} label="精排 Top1" value={topScore} />
+          <TraceRow icon={ShieldCheck} label="引用定位" value={metadataLabel} />
+          {terms.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {terms.slice(0, 10).map((term) => (
+                <span key={term} className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700">
+                  {term}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TraceRow({icon: Icon, label, value}: {icon: LucideIcon; label: string; value: string}) {
+  return (
+    <div className="grid grid-cols-[18px_76px_1fr] items-start gap-2 text-xs leading-5">
+      <Icon className="mt-0.5 h-4 w-4 text-slate-400" />
+      <span className="font-medium text-slate-500">{label}</span>
+      <span className="break-words text-slate-700">{value}</span>
+    </div>
+  );
+}
+
 function CitationEvidenceCard({citation}: {citation: Citation}) {
   const metadata = citation.metadata || {};
   const chips = [
@@ -288,6 +394,7 @@ function CitationEvidenceCard({citation}: {citation: Citation}) {
     metadata.heading || "",
     ...(metadata.system || []),
     ...(metadata.dtc || []),
+    ...(citation.retrieval_terms || []),
     ...(citation.keyword_matches || []),
   ].filter(Boolean).slice(0, 6);
 
@@ -308,9 +415,36 @@ function CitationEvidenceCard({citation}: {citation: Citation}) {
         <span>重排 {formatScore(citation.rerank_score)}</span>
         <span>{(citation.sources || []).join(" + ") || "vector"}</span>
       </div>
+      {citation.retrieval_terms?.length ? (
+        <div className="mt-2 text-[11px] leading-5 text-slate-500">
+          检索词：{citation.retrieval_terms.slice(0, 6).join(" / ")}
+        </div>
+      ) : null}
       <p className="mt-2 line-clamp-5 text-xs leading-5 text-slate-600">{citation.content}</p>
     </div>
   );
+}
+
+function evidenceTerms(citations: Citation[]) {
+  const values = citations.flatMap((citation) => [
+    ...(citation.retrieval_terms || []),
+    ...(citation.keyword_matches || []),
+    ...(citation.metadata?.dtc || []),
+    ...(citation.metadata?.system || []),
+  ]);
+  return Array.from(new Set(values.filter(Boolean))).slice(0, 12);
+}
+
+function formatMetadataLabel(citation: Citation) {
+  const metadata = citation.metadata || {};
+  const parts = [
+    metadata.page ? `第 ${metadata.page} 页` : "",
+    metadata.heading || "",
+    ...(metadata.system || []),
+    ...(metadata.dtc || []),
+    metadata.vehicle_model ? `车型 ${metadata.vehicle_model}` : "",
+  ].filter(Boolean);
+  return parts.slice(0, 5).join(" / ") || citation.title;
 }
 
 function splitDiagnosticSections(content: string) {
