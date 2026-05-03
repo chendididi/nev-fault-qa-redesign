@@ -107,8 +107,8 @@ export default function ModelPage() {
   }
 
   return (
-    <AppShell>
-      <div className="h-full overflow-y-auto px-4 py-5 md:px-6">
+    <AppShell contentScrollable>
+      <div className="min-h-full px-4 py-5 md:px-6">
       <div className="mx-auto max-w-6xl pb-10">
         <header className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
