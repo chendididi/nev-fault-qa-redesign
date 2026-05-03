@@ -108,7 +108,8 @@ export default function ModelPage() {
 
   return (
     <AppShell>
-      <div className="max-w-6xl p-6">
+      <div className="h-full overflow-y-auto px-4 py-5 md:px-6">
+      <div className="mx-auto max-w-6xl pb-10">
         <header className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-xl font-semibold">模型配置</h1>
@@ -180,8 +181,8 @@ export default function ModelPage() {
               <Activity className="h-4 w-4 text-accent" />
               <h2 className="text-sm font-semibold">任务路由</h2>
             </div>
-            <div className="overflow-hidden rounded-md border border-line">
-              <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto rounded-md border border-line">
+              <table className="min-w-[900px] w-full text-left text-sm">
                 <thead className="bg-panel text-xs text-slate-500">
                   <tr>
                     <th className="px-3 py-3">任务</th>
@@ -252,6 +253,7 @@ export default function ModelPage() {
             </button>
           </div>
         </form>
+      </div>
       </div>
     </AppShell>
   );
