@@ -1,0 +1,9 @@
+variant,method,hit_at_1,hit_at_3,hit_at_5,mrr,ndcg_at_5,citation_accuracy_at_k,keyword_coverage_at_k,safety_evidence_coverage,subset,cases
+no_rag,No RAG,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,full,64
+dense_only,Dense,0.96875,1.0,1.0,0.984375,0.9878264427197307,0.9609375,0.8875,1.0,full,64
+dense_keyword,Dense+Keyword,0.96875,1.0,1.0,0.984375,0.9878264427197307,0.9609375,0.8875,1.0,full,64
+hybrid_rerank,Hybrid+Rerank,1.0,1.0,1.0,1.0,0.9979429994301278,0.9791666666666666,0.8953125,1.0,full,64
+no_rag,No RAG,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,multi_evidence,28
+dense_only,Dense,0.9642857142857143,1.0,1.0,0.9821428571428571,0.9869333209735556,0.9464285714285714,0.8928571428571429,1.0,multi_evidence,28
+dense_keyword,Dense+Keyword,0.9642857142857143,1.0,1.0,0.9821428571428571,0.9869333209735556,0.9464285714285714,0.8928571428571429,1.0,multi_evidence,28
+hybrid_rerank,Hybrid+Rerank,1.0,1.0,1.0,1.0,1.0,0.9880952380952381,0.8928571428571429,1.0,multi_evidence,28

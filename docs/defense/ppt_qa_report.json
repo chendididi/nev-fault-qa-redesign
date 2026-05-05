@@ -1,0 +1,7 @@
+{
+  "pptx": "/home/chendi2721/nev-fault-qa-redesign/.claude/worktrees/quizzical-perlman-40d40e/docs/defense/chen_di_nev_fault_qa_defense.pptx",
+  "slides": 13,
+  "issues": [],
+  "status": "passed",
+  "note": "Checked slide bounds and placeholder text through python-pptx. Contact sheet is a script-level preview, not a PowerPoint re-render."
+}
