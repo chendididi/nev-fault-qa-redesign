@@ -1,20 +1,32 @@
 services:
   api:
+    build:
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu124}
+        TORCH_PACKAGE: ${TORCH_PACKAGE:-torch==2.11.0+cu124}
+    gpus: all
     environment:
       OPENAI_BASE_URL: http://vllm:8000/v1
       OPENAI_API_KEY: ${VLLM_API_KEY:-change-me-vllm-key}
       OPENAI_CHAT_MODEL: ${VLLM_SERVED_MODEL_NAME:-qwen-vl-demo}
       OPENAI_VISION_MODEL: ${VLLM_SERVED_MODEL_NAME:-qwen-vl-demo}
+      LOCAL_DEVICE: ${LOCAL_DEVICE:-cuda}
     depends_on:
       vllm:
         condition: service_started
 
   worker:
+    build:
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu124}
+        TORCH_PACKAGE: ${TORCH_PACKAGE:-torch==2.11.0+cu124}
+    gpus: all
     environment:
       OPENAI_BASE_URL: http://vllm:8000/v1
       OPENAI_API_KEY: ${VLLM_API_KEY:-change-me-vllm-key}
       OPENAI_CHAT_MODEL: ${VLLM_SERVED_MODEL_NAME:-qwen-vl-demo}
       OPENAI_VISION_MODEL: ${VLLM_SERVED_MODEL_NAME:-qwen-vl-demo}
+      LOCAL_DEVICE: ${LOCAL_DEVICE:-cuda}
     depends_on:
       vllm:
         condition: service_started
