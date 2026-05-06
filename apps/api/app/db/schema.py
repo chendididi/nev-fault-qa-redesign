@@ -118,6 +118,21 @@ def _init_db_locked(db: Session, settings) -> None:
             updated_at timestamptz NOT NULL DEFAULT now()
         )
     """))
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS document_rag_trace_events (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            document_id uuid REFERENCES documents(id) ON DELETE CASCADE,
+            step text NOT NULL,
+            status text NOT NULL,
+            duration_ms integer,
+            summary jsonb NOT NULL DEFAULT '{}'::jsonb,
+            preview text,
+            error text,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        )
+    """))
+    db.execute(text("CREATE INDEX IF NOT EXISTS document_rag_trace_document_idx ON document_rag_trace_events (document_id, created_at)"))
     db.execute(text(f"""
         CREATE TABLE IF NOT EXISTS chunks (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

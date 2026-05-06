@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { RefreshCcw, Trash2, Upload } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Eye, RefreshCcw, Trash2, Upload } from "lucide-react";
 import { AppShell } from "@/components/shell";
 import { api } from "@/lib/api";
 
@@ -9,6 +11,7 @@ type KB = { id: string; name: string; description: string };
 type Doc = { id: string; title: string; filename: string; status: string; error?: string; knowledge_base: string; created_at: string };
 
 export default function KnowledgePage() {
+  const router = useRouter();
   const [kbs, setKbs] = useState<KB[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [kbId, setKbId] = useState("");
@@ -55,10 +58,10 @@ export default function KnowledgePage() {
     form.set("knowledge_base_id", kbId);
     form.set("title", title || file.name);
     form.set("file", file);
-    await api("/api/admin/documents", {method: "POST", body: form});
+    const uploaded = await api<Doc>("/api/admin/documents", {method: "POST", body: form});
     setTitle("");
     setFile(null);
-    await load();
+    router.push(`/admin/knowledge/${uploaded.id}`);
   }
 
   return (
@@ -102,6 +105,9 @@ export default function KnowledgePage() {
                     {doc.error && <div className="mt-1 text-xs text-red-600">{doc.error}</div>}
                   </td>
                   <td className="flex gap-2 px-4 py-3">
+                    <Link title="查看 RAG 流程" className="rounded-md border border-line p-2" href={`/admin/knowledge/${doc.id}`}>
+                      <Eye className="h-4 w-4" />
+                    </Link>
                     <button title="重建索引" className="rounded-md border border-line p-2" onClick={() => api(`/api/admin/documents/${doc.id}/reingest`, {method: "POST"}).then(load)}>
                       <RefreshCcw className="h-4 w-4" />
                     </button>

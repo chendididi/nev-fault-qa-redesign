@@ -26,7 +26,8 @@ from app.models.provider import (
     rerank_texts,
     upsert_model_topology,
 )
-from app.rag.service import answer_question, stream_answer_chunks
+from app.rag.service import answer_question, run_document_rag_demo, stream_answer_chunks
+from app.rag.trace import get_rag_trace_response, record_trace_event, reset_document_trace
 
 settings = get_settings()
 app = FastAPI(title="NEV Fault QA API", version="0.1.0")
@@ -232,13 +233,46 @@ async def upload_document(
         "object_key": key,
         "created_by": user["id"],
     }).mappings().one()
-    db.execute(text("INSERT INTO ingestion_jobs (document_id) VALUES (:document_id)"), {"document_id": row["id"]})
+    job = db.execute(text("INSERT INTO ingestion_jobs (document_id) VALUES (:document_id) RETURNING id"), {"document_id": row["id"]}).mappings().one()
+    record_trace_event(db, str(row["id"]), "upload_saved", "done", summary={
+        "filename": file.filename or "document",
+        "content_type": file.content_type or "application/octet-stream",
+        "size_bytes": len(data),
+    })
+    record_trace_event(db, str(row["id"]), "queued", "done", summary={"job_id": str(job["id"])})
     db.commit()
     return serialize(row)
 
 
+@app.get("/api/admin/documents/{document_id}/rag-trace")
+def get_document_rag_trace(document_id: str, _: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    response = get_rag_trace_response(db, document_id)
+    if not response:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    return response
+
+
+@app.post("/api/admin/documents/{document_id}/rag-demo")
+async def document_rag_demo(document_id: str, payload: dict, _: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    question = str((payload or {}).get("question") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question 不能为空")
+    try:
+        return await run_document_rag_demo(db, document_id, question)
+    except ValueError as exc:
+        if str(exc) == "document_not_found":
+            raise HTTPException(status_code=404, detail="文档不存在") from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.post("/api/admin/documents/{document_id}/reingest")
 async def reingest_document(document_id: str, _: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    exists = db.execute(text("SELECT 1 FROM documents WHERE id=:id"), {"id": document_id}).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    reset_document_trace(db, document_id)
+    record_trace_event(db, document_id, "upload_saved", "done", summary={"source": "existing_object", "reason": "reingest"})
+    record_trace_event(db, document_id, "queued", "done", summary={"source": "manual_reingest"})
     db.execute(text("UPDATE ingestion_jobs SET status='pending', error=NULL, updated_at=now() WHERE document_id=:id"), {"id": document_id})
     db.execute(text("UPDATE documents SET status='pending', error=NULL, updated_at=now() WHERE id=:id"), {"id": document_id})
     db.commit()
